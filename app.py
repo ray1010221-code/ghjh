@@ -1,20 +1,20 @@
-from flask import Flask, request, jsonify, render_template_string, redirect, url_for, session
+from flask import Flask, request, render_template_string, redirect, url_for, session
 import json
 import os
 from dotenv import load_dotenv
 
-# === 載入 .env ===
+# 嘗試載入 .env（本地端）
 load_dotenv()
 
-PASSWORD = os.getenv("APP_PASSWORD")
-SECRET_KEY = os.getenv("FLASK_SECRET_KEY")
-
 app = Flask(__name__)
-app.secret_key = SECRET_KEY
+
+# 從環境變數中讀取設定
+PASSWORD = os.getenv("APP_PASSWORD")
+app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 DATA_FILE = "data.json"
 
-# === 初始化資料檔 ===
+# 初始化 data.json
 if not os.path.exists(DATA_FILE):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump({}, f, ensure_ascii=False, indent=4)
@@ -40,37 +40,6 @@ def get_target(data, path_list):
     return current
 
 
-# === 登入頁面 ===
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if request.method == "POST":
-        input_pwd = request.form.get("password", "").strip()
-        if input_pwd == PASSWORD:
-            session["logged_in"] = True
-            return redirect(url_for("index"))
-        else:
-            return render_template_string("""
-                <h2>密碼錯誤</h2>
-                <a href="/login">返回登入</a>
-            """)
-
-    return render_template_string("""
-        <h2>請輸入密碼以進入系統</h2>
-        <form method="POST">
-            <input type="password" name="password" placeholder="輸入密碼">
-            <button type="submit">登入</button>
-        </form>
-    """)
-
-
-# === 登出 ===
-@app.route("/logout")
-def logout():
-    session.pop("logged_in", None)
-    return redirect(url_for("login"))
-
-
-# === 主頁（需登入） ===
 @app.route("/", methods=["GET"])
 def index():
     if not session.get("logged_in"):
@@ -78,7 +47,7 @@ def index():
 
     return render_template_string("""
         <h2>JSON 多層管理工具</h2>
-        <a href="/logout">登出</a><br><br>
+        <p><a href="/logout">登出</a></p>
 
         <h3>插入 / 修改</h3>
         <form method="POST" action="/insert">
@@ -108,6 +77,34 @@ def index():
         <h3>目前 JSON</h3>
         <pre id="json-display">{{ json_data }}</pre>
     """, json_data=json.dumps(load_data(), ensure_ascii=False, indent=4))
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        password = request.form.get("password", "").strip()
+        if password == PASSWORD:
+            session["logged_in"] = True
+            return redirect(url_for("index"))
+        else:
+            return render_template_string("""
+                <h3>密碼錯誤！</h3>
+                <a href="/login">再試一次</a>
+            """)
+
+    return render_template_string("""
+        <h2>請輸入密碼</h2>
+        <form method="POST">
+            <input type="password" name="password" placeholder="輸入密碼"><br><br>
+            <button type="submit">登入</button>
+        </form>
+    """)
+
+
+@app.route("/logout")
+def logout():
+    session.pop("logged_in", None)
+    return redirect(url_for("login"))
 
 
 @app.route("/insert", methods=["POST"])
@@ -167,4 +164,6 @@ def delete():
 
 
 if __name__ == "__main__":
-    app.run()
+    # Render 預設會使用 PORT 環境變數
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
